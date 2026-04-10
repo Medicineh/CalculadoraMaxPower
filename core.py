@@ -1,4 +1,5 @@
 import ast
+import keyword
 import operator
 import sympy as sp
 from decimal import Decimal, getcontext
@@ -17,9 +18,19 @@ class SafeEvaluator:
 
     def eval(self, expr: str):
         if "=" in expr:
-            name, value = expr.split("=", 1)
-            name = name.strip()
-            val = self._eval(ast.parse(value, mode='eval').body)
+            parsed = ast.parse(expr, mode='exec')
+            if len(parsed.body) != 1 or not isinstance(parsed.body[0], ast.Assign):
+                raise ValueError("Asignación inválida; solo se permite una asignación simple")
+
+            assign = parsed.body[0]
+            if len(assign.targets) != 1 or not isinstance(assign.targets[0], ast.Name):
+                raise ValueError("Asignación inválida; solo se permite una asignación simple")
+
+            name = assign.targets[0].id
+            if not name.isidentifier() or keyword.iskeyword(name):
+                raise ValueError("Nombre de variable inválido")
+
+            val = self._eval(assign.value)
             self.variables[name] = val
             return val
         return self._eval(ast.parse(expr, mode='eval').body)

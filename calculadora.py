@@ -1,11 +1,15 @@
 import tkinter as tk
+import tkinter.messagebox as messagebox
 import json
 import os
 import time
+import logging
 from core import CalculatorCore
 
 CONFIG_FILE = "config.json"
 HIST_FILE = "historial.json"
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
 
 DEFAULT = {
     "decimales": 20,
@@ -168,34 +172,71 @@ class Calculadora(tk.Tk):
 
         def guardar():
             try:
-                dec = min(100, max(1, int(dec_entry.get())))
-                dias = max(0, int(dias_entry.get()))
+                dec = int(dec_entry.get())
+            except ValueError:
+                logger.exception("Error de validación en 'Decimales'.")
+                messagebox.showerror("Error de validación", "El campo 'Decimales' debe ser un número entero.")
+                return
 
-                self.config_data["decimales"] = dec
-                self.config_data["auto_borrado_dias"] = dias
-                self.config_data["modo_default"] = modo_var.get()
+            try:
+                dias = int(dias_entry.get())
+            except ValueError:
+                logger.exception("Error de validación en 'Auto borrar historial'.")
+                messagebox.showerror(
+                    "Error de validación",
+                    "El campo 'Auto borrar historial' debe ser un número entero."
+                )
+                return
 
-                self.core = CalculatorCore(dec, mode=self.core.mode)
+            dec = min(100, max(1, dec))
+            dias = max(0, dias)
 
+            self.config_data["decimales"] = dec
+            self.config_data["auto_borrado_dias"] = dias
+            self.config_data["modo_default"] = modo_var.get()
+
+            self.core = CalculatorCore(dec, mode=self.core.mode)
+
+            try:
                 with open(CONFIG_FILE, "w") as f:
                     json.dump(self.config_data, f)
+            except OSError:
+                logger.exception("No se pudo escribir el archivo de configuración.")
+                messagebox.showerror("Error al guardar", "No se pudo escribir el archivo de configuración.")
+                return
+            except (TypeError, ValueError):
+                logger.exception("No se pudo serializar la configuración en JSON.")
+                messagebox.showerror("Error al guardar", "No se pudo serializar la configuración en formato JSON.")
+                return
 
-                win.destroy()
-            except:
-                pass
+            win.destroy()
 
         tk.Button(win, text="Guardar", command=guardar).pack(pady=10)
 
     def _load_config(self):
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE) as f:
-                return json.load(f)
+            try:
+                with open(CONFIG_FILE) as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError):
+                logger.exception("No se pudo cargar la configuración. Se usarán valores por defecto.")
+                messagebox.showerror(
+                    "Error de configuración",
+                    "No se pudo cargar la configuración. Se usarán valores por defecto."
+                )
         return DEFAULT
 
     def _load_hist(self):
         if os.path.exists(HIST_FILE):
-            with open(HIST_FILE) as f:
-                return json.load(f)
+            try:
+                with open(HIST_FILE) as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError):
+                logger.exception("No se pudo cargar el historial. Se iniciará vacío.")
+                messagebox.showerror(
+                    "Error de historial",
+                    "No se pudo cargar el historial. Se iniciará vacío."
+                )
         return []
 
     def _save_hist(self):

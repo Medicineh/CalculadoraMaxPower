@@ -1,67 +1,45 @@
 import ast
-import operator
-import sympy as sp
 from decimal import Decimal, getcontext
 
-OPS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.Pow: operator.pow,
+OPERADORES = {
+    ast.Add: lambda a, b: a + b,
+    ast.Sub: lambda a, b: a - b,
+    ast.Mult: lambda a, b: a * b,
+    ast.Div: lambda a, b: a / b,
+    ast.Pow: lambda a, b: a ** b,
 }
 
-class SafeEvaluator:
-    def __init__(self):
-        self.variables = {}
+def normalizar_expr(expr, modo):
+    if modo == "ignorar":
+        return expr.replace(" ", "")
+    if modo == "suma":
+        return expr.replace(" ", "+")
 
-    def eval(self, expr: str):
-        if "=" in expr:
-            name, value = expr.split("=", 1)
-            name = name.strip()
-            val = self._eval(ast.parse(value, mode='eval').body)
-            self.variables[name] = val
-            return val
-        return self._eval(ast.parse(expr, mode='eval').body)
-
-    def _eval(self, node):
-        if isinstance(node, ast.BinOp):
-            return OPS[type(node.op)](
-                self._eval(node.left),
-                self._eval(node.right)
-            )
-        elif isinstance(node, ast.UnaryOp):
-            return -self._eval(node.operand)
-        elif isinstance(node, ast.Constant):
-            return Decimal(str(node.value))
-        elif isinstance(node, ast.Name):
-            if node.id in self.variables:
-                return self.variables[node.id]
-            raise ValueError
+    tokens = expr.split()
+    nueva = ""
+    for t in tokens:
+        if nueva and nueva[-1].isdigit() and t.isdigit():
+            nueva += t
         else:
-            raise ValueError
+            if nueva:
+                nueva += " "
+            nueva += t
+    return nueva.replace(" ", "")
 
-class CalculatorCore:
-    def __init__(self, precision=50, mode="decimal"):
-        self.mode = mode
-        self.evaluator = SafeEvaluator()
-        getcontext().prec = precision
+def evaluar(expr, decimales):
+    getcontext().prec = max(100, decimales + 5)
 
-    def calculate(self, expr: str):
-        try:
-            if self.mode == "decimal":
-                return str(self.evaluator.eval(expr).normalize())
-            else:
-                return str(sp.N(sp.sympify(expr, locals={
-                    "sin": sp.sin,
-                    "cos": sp.cos,
-                    "tan": sp.tan,
-                    "log": sp.log,
-                    "sqrt": sp.sqrt,
-                    "pi": sp.pi,
-                    "e": sp.E
-                }), getcontext().prec))
-        except ZeroDivisionError:
-            return "∞"
-        except Exception:
-            return "Error"
+    def _eval(node):
+        if isinstance(node, ast.BinOp):
+            return OPERADORES[type(node.op)](_eval(node.left), _eval(node.right))
+        elif isinstance(node, ast.Num):
+            return Decimal(str(node.n))
+        elif isinstance(node, ast.Expression):
+            return _eval(node.body)
+        else:
+            raise ValueError("Expresión no válida")
+
+    tree = ast.parse(expr, mode="eval")
+    resultado = _eval(tree)
+
+    return format(resultado, f".{decimales}f")

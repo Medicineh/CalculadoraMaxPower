@@ -18,6 +18,7 @@ class CalculadoraUI:
         self.display.pack(fill="x", padx=10, pady=10)
 
         botones = [
+            "C",
             "789/",
             "456*",
             "123-",

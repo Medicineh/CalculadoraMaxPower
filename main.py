@@ -9,7 +9,7 @@ def main():
     historial = limpiar_antiguos(historial, config["auto_borrar_dias"])
 
     root = tk.Tk()
-    root.title("Calculadora PRO")
+    root.title("Calculadora MAX POWER") #Ops
 
     CalculadoraUI(root, config, historial)
 
